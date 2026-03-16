@@ -1,0 +1,18 @@
+# Security
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Data / Images
+data/images/*
+!data/images/.gitkeep
+
+# Caches
+.huggingface/
