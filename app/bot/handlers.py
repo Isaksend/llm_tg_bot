@@ -3,6 +3,8 @@ from aiogram.types import Message
 from aiogram.filters import Command
 from typing import Dict, List
 from collections import defaultdict
+import logging
+
 
 from app.config import settings
 from app.llm.client import OllamaClient
@@ -57,33 +59,41 @@ async def handle_photo(message: Message, bot: Bot):
 
     status_msg = await message.answer("👀 Изучаю изображение...")
     
-    file_info = await bot.get_file(photo.file_id)
-    downloaded_file = await bot.download_file(file_info.file_path)
-    image_bytes = downloaded_file.read()
+    try:
+        file_info = await bot.get_file(photo.file_id)
+        downloaded_file = await bot.download_file(file_info.file_path)
+        image_bytes = downloaded_file.read()
 
-    caption = await vision_processor.generate_caption(image_bytes)
-    user_text = message.caption or ""
-    
-    if user_text:
-        combined_prompt = f"На изображении: {caption}\nЗапрос пользователя: {user_text}"
-    else:
-        combined_prompt = f"Опиши подробнее то, что изображено: {caption}"
+        caption = await vision_processor.generate_caption(image_bytes)
+        user_text = message.caption or ""
+        
+        if user_text:
+            combined_prompt = f"На изображении: {caption}\nЗапрос пользователя: {user_text}"
+        else:
+            combined_prompt = f"Опиши подробнее то, что изображено: {caption}"
 
-    add_message(message.from_user.id, "user", combined_prompt)
-    await status_msg.edit_text("🧠 Генерирую ответ...")
-    
-    response = await llm_client.generate_response(get_context(message.from_user.id))
-    add_message(message.from_user.id, "assistant", response)
-    
-    await status_msg.edit_text(response)
+        add_message(message.from_user.id, "user", combined_prompt)
+        await status_msg.edit_text("🧠 Генерирую ответ...")
+        
+        response = await llm_client.generate_response(get_context(message.from_user.id))
+        add_message(message.from_user.id, "assistant", response)
+        
+        await status_msg.edit_text(response)
+    except Exception as e:
+        logging.exception("Ошибка при обработке фото")
+        await status_msg.edit_text("❌ Произошла ошибка при обработке изображения или запроса к нейросети. Попробуйте еще раз позже.")
 
 @router.message(F.text)
 async def handle_text(message: Message):
     status_msg = await message.answer("🧠 Думаю...")
     user_id = message.from_user.id
     
-    add_message(user_id, "user", message.text)
-    response = await llm_client.generate_response(get_context(user_id))
-    add_message(user_id, "assistant", response)
-    
-    await status_msg.edit_text(response)
+    try:
+        add_message(user_id, "user", message.text)
+        response = await llm_client.generate_response(get_context(user_id))
+        add_message(user_id, "assistant", response)
+        
+        await status_msg.edit_text(response)
+    except Exception as e:
+        logging.exception("Ошибка при обработке текста")
+        await status_msg.edit_text("❌ Произошла ошибка при обращении к языковой модели. Убедитесь, что модель Ollama запущена.")
